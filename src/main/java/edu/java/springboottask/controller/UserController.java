@@ -7,6 +7,7 @@ import edu.java.springboottask.exception.InvalidDataException;
 import edu.java.springboottask.exception.NoResourcePresentException;
 import edu.java.springboottask.service.ServiceException;
 import edu.java.springboottask.service.UserService;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -22,10 +23,12 @@ import static edu.java.springboottask.utility.Validation.validatePassword;
 public class UserController {
     private UserService userService;
     private AuthBean authBean;
+    private MeterRegistry meterRegistry;
 
-    public UserController(UserService userService, AuthBean authBean) {
+    public UserController(UserService userService, AuthBean authBean, MeterRegistry meterRegistry) {
         this.userService = userService;
         this.authBean = authBean;
+        this.meterRegistry = meterRegistry;
     }
 
     @GetMapping("/login")
@@ -33,15 +36,22 @@ public class UserController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Login in App")
     public void login(@RequestParam("username") String username, @RequestParam("password") String password) throws NoResourcePresentException, InvalidDataException {
+
+        meterRegistry.counter("login_counter", "version", "v1.0").increment();
+
         if (validateLogin(username) && validatePassword(password)) {
 
+            meterRegistry.counter("Login_counter_by_username", "username", username).increment();
+
             Optional<User> user = userService.findByUsernameAndPassword(username, password);
+
             if (user.isPresent()) {
+
                 authBean.setUser(user.get());
+
             } else {
                 throw new NoResourcePresentException("No such user present in DB");
             }
-
         }
     }
 
